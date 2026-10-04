@@ -27,6 +27,7 @@ import sys
 import threading
 import queue
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import messagebox
 
 import serial
@@ -47,7 +48,22 @@ DEBUG_INTERFACE_NUMBER = 2
 
 APP_NAME = "MODplate Configuration"
 
-FONT = ("Consolas", 16)
+def _pick_font(root, preferred, fallback, size, weight="normal"):
+    """Returns the first font family in `preferred` that's actually
+    installed, or `fallback` (one of Tk's own built-in generic fonts,
+    always available on every platform) if none of them are - needed
+    because this app's fonts were originally picked for Windows only
+    (Consolas, Segoe UI), neither of which exists on macOS. There, Tk
+    silently substitutes some other, typically wider and not necessarily
+    monospace, font instead - which both breaks the terminal's fixed-width
+    column alignment (the Attached Plates / Register Map listings) and
+    wraps menu lines early, since the window was sized assuming Consolas's
+    narrower glyphs. Must be called after a Tk root exists - querying
+    installed fonts needs one.
+    """
+    available = set(tkfont.families(root))
+    family = next((f for f in preferred if f in available), fallback)
+    return (family, size, weight) if weight != "normal" else (family, size)
 
 # Window/taskbar icon - the Pi-Plates logo's circular pi mark (see
 # logo_data.h), cropped square and pre-rendered at two sizes with a
@@ -765,11 +781,16 @@ class TerminalApp:
             # around it.
             banner = tk.Frame(root, bg="white")
             banner.pack(fill="x")
+            heading_font = _pick_font(root, ["Segoe UI", "Helvetica Neue", "Helvetica", "Arial"],
+                                       "TkDefaultFont", 18, "bold")
             tk.Label(banner, image=self._logo_image, bg="white").pack(side="left")
             tk.Label(banner, text=APP_NAME, bg="white", fg="black",
-                     font=("Segoe UI", 18, "bold")).pack(side="left", padx=(12, 0))
+                     font=heading_font).pack(side="left", padx=(12, 0))
         except tk.TclError:
             pass
+
+        mono_font = _pick_font(root, ["Consolas", "Menlo", "DejaVu Sans Mono", "Courier New", "Monaco"],
+                                "TkFixedFont", 16)
 
         frame = tk.Frame(root, bg=BG_COLOR)
         frame.pack(fill="both", expand=True)
@@ -782,7 +803,7 @@ class TerminalApp:
             bg=BG_COLOR,
             fg=FG_COLOR,
             insertbackground=FG_COLOR,
-            font=FONT,
+            font=mono_font,
             wrap="word",
             yscrollcommand=scrollbar.set,
         )
