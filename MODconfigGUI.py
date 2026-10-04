@@ -800,8 +800,17 @@ class TerminalApp:
         except tk.TclError:
             pass
 
-        mono_font = _pick_font(root, "Consolas", "Menlo",
-                                ["DejaVu Sans Mono", "Courier New", "Monaco"], "TkFixedFont", 16)
+        # macOS gets Tk's own internal "TkFixedFont" alias rather than
+        # "Menlo" by name - PyInstaller's bundled Tcl/Tk on macOS has a
+        # known gap where it fails to resolve real OS font names (Menlo
+        # included) against the system font catalog and silently
+        # substitutes something else, proportional-width, instead
+        # (confirmed: hardcoding "Menlo" directly, no probing involved,
+        # produced no visible change at all). TkFixedFont is resolved
+        # inside Tcl/Tk itself instead of via that broken OS lookup, so it
+        # isn't subject to the same failure, and it's guaranteed monospace
+        # by definition on every platform.
+        mono_font = ("Consolas", 16) if sys.platform == "win32" else ("TkFixedFont", 16)
 
         frame = tk.Frame(root, bg=BG_COLOR)
         frame.pack(fill="both", expand=True)
