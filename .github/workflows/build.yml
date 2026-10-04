@@ -65,9 +65,15 @@ jobs:
         shell: bash
         run: echo "BUILD_VERSION = \"${GITHUB_SHA:0:7}\"" > _build_version.py
 
+      # --noupx: UPX-compressed executables are a common trigger for
+      # Windows Defender's ML/heuristic engine (self-extracting + packed
+      # resembles how real malware droppers unpack themselves) - this is a
+      # widely reported PyInstaller false positive (e.g.
+      # "Trojan:Win32/Bearfoos.B!ml", the "!ml" meaning heuristic, not a
+      # signature match), not an actual detection of anything in this app.
       - name: Build (Windows)
         if: runner.os == 'Windows'
-        run: pyinstaller --onefile --windowed --name MODconfig --icon assets/app_icon.ico MODconfigGUI.py
+        run: pyinstaller --onefile --windowed --noupx --name MODconfig --icon assets/app_icon.ico MODconfigGUI.py
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
