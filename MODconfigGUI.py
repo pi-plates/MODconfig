@@ -914,7 +914,17 @@ class TerminalApp:
                 if item is None:
                     self._show_disconnected()
                     return
-                text = item.decode("utf-8", errors="replace")
+                # The board's stdio layer sends "\r\n" line endings (Pico
+                # SDK's CRLF translation, on by default), but Tk's Text
+                # widget only treats '\n' as a line break - a literal '\r'
+                # left in the stream gets inserted as an ordinary (if
+                # invisible) character occupying its own cell, and
+                # control characters like that can render as an
+                # unpredictably wide placeholder glyph depending on the
+                # platform/font, throwing wrapping off at what looks like
+                # random points. Dropped here, before any further
+                # processing - this app has no use for a bare '\r'.
+                text = item.decode("utf-8", errors="replace").replace("\r", "")
                 self._ansi_carry = self._process_ansi(self._ansi_carry + text)
         except queue.Empty:
             pass
