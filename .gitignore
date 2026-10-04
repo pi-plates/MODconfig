@@ -6,3 +6,4 @@ dist/
 *.spec
 *.exe
 desktop.ini
+_build_version.py

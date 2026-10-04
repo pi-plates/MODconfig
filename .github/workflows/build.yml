@@ -54,6 +54,17 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      # Lets the built app show exactly which commit it came from (in its
+      # window title) - makes "is this actually the latest build?" a
+      # one-glance answer instead of a guess, since a release asset's
+      # download URL stays the same across pushes that reuse the same tag
+      # and filename, which a browser or CDN can cache. MODconfigGUI.py
+      # imports this if present, falling back to "dev" when run from
+      # source without it.
+      - name: Write build version
+        shell: bash
+        run: echo "BUILD_VERSION = \"${GITHUB_SHA:0:7}\"" > _build_version.py
+
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: pyinstaller --onefile --windowed --name MODconfig --icon assets/app_icon.ico MODconfigGUI.py
