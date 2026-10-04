@@ -48,21 +48,32 @@ DEBUG_INTERFACE_NUMBER = 2
 
 APP_NAME = "MODplate Configuration"
 
-def _pick_font(root, preferred, fallback, size, weight="normal"):
-    """Returns the first font family in `preferred` that's actually
-    installed, or `fallback` (one of Tk's own built-in generic fonts,
-    always available on every platform) if none of them are - needed
-    because this app's fonts were originally picked for Windows only
-    (Consolas, Segoe UI), neither of which exists on macOS. There, Tk
-    silently substitutes some other, typically wider and not necessarily
-    monospace, font instead - which both breaks the terminal's fixed-width
-    column alignment (the Attached Plates / Register Map listings) and
-    wraps menu lines early, since the window was sized assuming Consolas's
-    narrower glyphs. Must be called after a Tk root exists - querying
-    installed fonts needs one.
+def _pick_font(root, win_family, mac_family, other_preferred, other_fallback, size, weight="normal"):
+    """Returns a font appropriate for the running platform. Windows and
+    macOS get `win_family`/`mac_family` directly, with no check that
+    they're actually installed - both ship with the OS itself (Consolas
+    since Vista, Menlo since OS X Lion), so this used to instead query
+    tkinter.font.families() to confirm before using them, but that query
+    has turned out to be unreliable inside a PyInstaller --onefile
+    --windowed macOS .app bundle specifically: PyInstaller bundles its own
+    Tcl/Tk rather than using the system's, and that bundled copy doesn't
+    reliably see the host Mac's font list at runtime, which was silently
+    failing to find "Menlo" and falling back to some other, non-monospace
+    font - breaking the terminal's fixed-width column alignment and
+    wrapping menu lines far earlier than the window's actual width should
+    require. Linux fonts vary too much by distro to hardcode one name, so
+    that platform still probes `other_preferred`, falling back to
+    `other_fallback` (one of Tk's own built-in generic fonts, always
+    available) if none of them are installed either. Must be called after
+    a Tk root exists - the Linux probe needs one.
     """
-    available = set(tkfont.families(root))
-    family = next((f for f in preferred if f in available), fallback)
+    if sys.platform == "win32":
+        family = win_family
+    elif sys.platform == "darwin":
+        family = mac_family
+    else:
+        available = set(tkfont.families(root))
+        family = next((f for f in other_preferred if f in available), other_fallback)
     return (family, size, weight) if weight != "normal" else (family, size)
 
 # Window/taskbar icon - the Pi-Plates logo's circular pi mark (see
@@ -781,16 +792,16 @@ class TerminalApp:
             # around it.
             banner = tk.Frame(root, bg="white")
             banner.pack(fill="x")
-            heading_font = _pick_font(root, ["Segoe UI", "Helvetica Neue", "Helvetica", "Arial"],
-                                       "TkDefaultFont", 18, "bold")
+            heading_font = _pick_font(root, "Segoe UI", "Helvetica Neue",
+                                       ["Helvetica", "Arial"], "TkDefaultFont", 18, "bold")
             tk.Label(banner, image=self._logo_image, bg="white").pack(side="left")
             tk.Label(banner, text=APP_NAME, bg="white", fg="black",
                      font=heading_font).pack(side="left", padx=(12, 0))
         except tk.TclError:
             pass
 
-        mono_font = _pick_font(root, ["Consolas", "Menlo", "DejaVu Sans Mono", "Courier New", "Monaco"],
-                                "TkFixedFont", 16)
+        mono_font = _pick_font(root, "Consolas", "Menlo",
+                                ["DejaVu Sans Mono", "Courier New", "Monaco"], "TkFixedFont", 16)
 
         frame = tk.Frame(root, bg=BG_COLOR)
         frame.pack(fill="both", expand=True)
