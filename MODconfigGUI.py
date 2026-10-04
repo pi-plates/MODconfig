@@ -762,9 +762,52 @@ class TerminalApp:
         self._known_tags = set()
 
         root.title(f"{APP_NAME} - {ser.port}")
-        root.geometry("1200x600")
         root.configure(bg=BG_COLOR)
         root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        # macOS gets Tk's own internal "TkFixedFont" alias rather than
+        # "Menlo" by name - PyInstaller's bundled Tcl/Tk on macOS has a
+        # known gap where it fails to resolve real OS font names against
+        # the system catalog. TkFixedFont is resolved inside Tcl/Tk itself
+        # instead of via that lookup, and is guaranteed monospace by
+        # definition on every platform.
+        mono_family = "Consolas" if sys.platform == "win32" else "TkFixedFont"
+
+        # Sized for the widest content the firmware ever sends (the
+        # Attached Plates table: 14 + 8*10 = 94 columns - see
+        # print_plate_scan_line() in cdc_menu.c), but a fixed pixel guess
+        # for the window isn't reliable: switching between two completely
+        # different font specifications (Menlo by name, then TkFixedFont)
+        # produced byte-for-byte identical, still-too-narrow line wrapping
+        # on one user's Mac - the font choice was never actually the
+        # variable. Some platform/Tk rendering quirk (likely Retina/HiDPI
+        # scaling PyInstaller's bundled Tcl/Tk isn't accounting for
+        # correctly) was making every character render far wider than its
+        # point size implies, on every font tried alike - possibly wide
+        # enough that simply measuring it and sizing the window to match
+        # could itself demand a window wider than the actual screen. So
+        # this instead caps the window to a safe fraction of the screen
+        # and shrinks the font size (not the column target) until the
+        # target column count actually fits within that cap - adapting to
+        # whatever the real character width turns out to be, without ever
+        # producing an offscreen or absurdly large window.
+        target_columns = 100
+        target_rows = 24
+        max_width_px = min(1400, int(root.winfo_screenwidth() * 0.85))
+        max_height_px = min(900, int(root.winfo_screenheight() * 0.85))
+
+        font_size = 16
+        measure_font = tkfont.Font(root=root, family=mono_family, size=font_size)
+        while font_size > 8 and measure_font.measure("0") * target_columns + 40 > max_width_px:
+            font_size -= 1
+            measure_font.configure(size=font_size)
+        mono_font = (mono_family, font_size)
+
+        char_width = measure_font.measure("0")
+        line_height = measure_font.metrics("linespace")
+        width_px = min(max_width_px, char_width * target_columns + 40)
+        height_px = min(max_height_px, line_height * target_rows + 150)
+        root.geometry(f"{width_px}x{height_px}")
 
         # Window/taskbar icon - the logo's own circular pi mark (see
         # _ICON_PNG_B64_64/32 above). Kept as attributes (not just locals)
@@ -799,18 +842,6 @@ class TerminalApp:
                      font=heading_font).pack(side="left", padx=(12, 0))
         except tk.TclError:
             pass
-
-        # macOS gets Tk's own internal "TkFixedFont" alias rather than
-        # "Menlo" by name - PyInstaller's bundled Tcl/Tk on macOS has a
-        # known gap where it fails to resolve real OS font names (Menlo
-        # included) against the system font catalog and silently
-        # substitutes something else, proportional-width, instead
-        # (confirmed: hardcoding "Menlo" directly, no probing involved,
-        # produced no visible change at all). TkFixedFont is resolved
-        # inside Tcl/Tk itself instead of via that broken OS lookup, so it
-        # isn't subject to the same failure, and it's guaranteed monospace
-        # by definition on every platform.
-        mono_font = ("Consolas", 16) if sys.platform == "win32" else ("TkFixedFont", 16)
 
         frame = tk.Frame(root, bg=BG_COLOR)
         frame.pack(fill="both", expand=True)
