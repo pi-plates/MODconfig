@@ -22,8 +22,19 @@ jobs:
         include:
           - os: windows-latest
             artifact_name: MODconfig-windows
+          # macos-latest is an Apple Silicon (arm64) runner, and PyInstaller
+          # builds for whatever CPU it's run on - a single macos-latest job
+          # produces an arm64-only binary that fails on Intel Macs with
+          # "not supported on this Mac" (Rosetta translates Intel code to
+          # run on Apple Silicon, not the other way around). Built
+          # separately on both so each Mac gets a binary that actually runs
+          # on it, rather than trying for one universal2 build (which needs
+          # a universal2 Python the hosted runners don't provide by
+          # default).
           - os: macos-latest
-            artifact_name: MODconfig-macos
+            artifact_name: MODconfig-macos-arm64
+          - os: macos-15-intel
+            artifact_name: MODconfig-macos-intel
           - os: ubuntu-latest
             artifact_name: MODconfig-linux
     runs-on: ${{ matrix.os }}

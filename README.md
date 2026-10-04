@@ -33,15 +33,23 @@ Debian/Ubuntu).
 ## Standalone executables
 
 Every push to `main` builds a standalone `MODconfig` executable for
-Windows, macOS and Linux via GitHub Actions (see
+Windows, Linux, and macOS (both Apple Silicon and Intel, as separate
+downloads - see below) via GitHub Actions (see
 `.github/workflows/build.yml`) - download them from that run's **Artifacts**
-section. Pushing a tag like `v1.0.0` additionally attaches all three to a
+section. Pushing a tag like `v1.0.0` additionally attaches all of them to a
 GitHub Release.
 
 PyInstaller can't cross-compile, so each platform's build actually runs on
 that platform's own GitHub-hosted runner - there's no Windows-only way to
 produce the macOS/Linux builds, which is the whole reason this is CI-driven
 rather than built locally.
+
+**macOS**: download `MODconfig-macos-arm64` on Apple Silicon Macs (M1/M2/M3/…)
+or `MODconfig-macos-intel` on Intel Macs - running the wrong one fails with
+"this application is not supported on this Mac" (Rosetta translates Intel
+code to run on Apple Silicon, not the other way around, so there's no way
+to make one binary cover both without a universal2 build, which the hosted
+runners' default Python doesn't support out of the box).
 
 To build one yourself on a given platform:
 
