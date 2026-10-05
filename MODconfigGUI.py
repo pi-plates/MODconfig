@@ -776,32 +776,38 @@ class TerminalApp:
         root.configure(bg=BG_COLOR)
         root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        # macOS gets Tk's own internal "TkFixedFont" alias rather than
-        # "Menlo" by name - PyInstaller's bundled Tcl/Tk on macOS has a
-        # known gap where it fails to resolve real OS font names against
-        # the system catalog. TkFixedFont is resolved inside Tcl/Tk itself
-        # instead of via that lookup, and is guaranteed monospace by
-        # definition on every platform.
-        mono_family = "Consolas" if sys.platform == "win32" else "TkFixedFont"
+        # A real, named monospace font - not Tk's "TkFixedFont" alias.
+        # TkFixedFont was tried first (see git history) on the theory that
+        # PyInstaller's bundled Tcl/Tk couldn't resolve real OS font names
+        # like "Menlo" against the system catalog, but that test ran
+        # before a since-fixed bug (stray '\r' characters from the board's
+        # CRLF line endings being inserted as literal, inconsistently-wide
+        # glyphs) was discovered and corrected - that bug was dominating
+        # the symptoms of *every* font tried, masking whether the font
+        # choice itself was actually taking effect. With it gone,
+        # TkFixedFont has now independently shown it is *not* reliably
+        # monospace either (confirmed: the Attached Plates grid's columns
+        # don't line up vertically between rows on macOS/Linux, even
+        # though the identical firmware output renders correctly in a
+        # plain system terminal) - so this goes back to real, specific
+        # font names, probing for one that's actually installed and
+        # falling back to TkFixedFont only if none of them are.
+        mono_family = _pick_font(root, "Consolas", "Menlo",
+                                  ["DejaVu Sans Mono", "Liberation Mono", "Courier New"],
+                                  "TkFixedFont", 16)[0]
 
         # Sized for the widest content the firmware ever sends (the
         # Attached Plates table: 14 + 8*10 = 94 columns - see
-        # print_plate_scan_line() in cdc_menu.c), but a fixed pixel guess
-        # for the window isn't reliable: switching between two completely
-        # different font specifications (Menlo by name, then TkFixedFont)
-        # produced byte-for-byte identical, still-too-narrow line wrapping
-        # on one user's Mac - the font choice was never actually the
-        # variable. Some platform/Tk rendering quirk (likely Retina/HiDPI
-        # scaling PyInstaller's bundled Tcl/Tk isn't accounting for
-        # correctly) was making every character render far wider than its
-        # point size implies, on every font tried alike - possibly wide
-        # enough that simply measuring it and sizing the window to match
-        # could itself demand a window wider than the actual screen. So
-        # this instead caps the window to a safe fraction of the screen
-        # and shrinks the font size (not the column target) until the
-        # target column count actually fits within that cap - adapting to
-        # whatever the real character width turns out to be, without ever
-        # producing an offscreen or absurdly large window.
+        # print_plate_scan_line() in cdc_menu.c). The window is capped to
+        # a safe fraction of the screen and the font size shrinks (not the
+        # column target) until the target column count actually fits
+        # within that cap, adapting to whatever the real character width
+        # turns out to be without ever producing an offscreen or absurdly
+        # large window - kept from the investigation above even though it
+        # turned out not to be the fix for the wrapping bug, since it's a
+        # real improvement in its own right (the Attached Plates table was
+        # quietly overflowing the old fixed 1200px window on every
+        # platform, Windows included, before this).
         target_columns = 100
         target_rows = 24
         max_width_px = min(1400, int(root.winfo_screenwidth() * 0.85))
